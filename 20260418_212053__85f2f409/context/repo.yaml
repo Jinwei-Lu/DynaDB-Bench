@@ -1,0 +1,4 @@
+repo_id: museum_artifact_large
+repo_root: D:/Machine_Learning/Deep_Learning/Project/DynaDB/repos/museum_artifact_large
+ground_truth_dependency_models: []
+verified_schemas: {}

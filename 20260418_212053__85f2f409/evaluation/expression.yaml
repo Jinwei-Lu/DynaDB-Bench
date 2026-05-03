@@ -1,0 +1,291 @@
+expression:
+  atoms:
+  - atom_id: 0969bc6d5432
+    event_log:
+      after_state: null
+      before_state: null
+      description: 'Exhibition curators across multiple halls have been managing tight
+        budgets that occasionally slip into overrun territory. The financial teams
+        noticed that several exhibitions with budget overruns had zero insurance coverage,
+        yet the risk_preparedness_score showed 0 for all of them. This created a dangerous
+        illusion: a score of 0 implied "no risk" when in fact these exhibitions had
+        the highest financial exposure. When the risk management dashboard was reviewed
+        by the board, these exhibitions appeared adequately prepared simply because
+        they had emergency plans in place, while their uninsured status went unnoticed.'
+      event_id: fd59d43a3917
+      event_type: DISTRIBUTION_SHIFT
+      target_object: int_exhibition_risk_profile
+      timestamp: '2026-04-18T21:45:35.149879Z'
+    event_log_info_level: medium
+    event_sql: "UPDATE \"Exhibitions\" \nSET \"actual_cost\" = \"BUDGET_USD\" * 1.06\n\
+      WHERE \"Exhibition_Catalog_Code\" IN ('EXH-2017-02', 'EXH-2020-02', 'EXH-2013-01')\n\
+      \  AND \"EXHIBITION_STATUS\" = 'Archived'\n  AND NOT EXISTS (\n    SELECT 1\
+      \ FROM \"stg_insurance_policies\" p \n    WHERE p.\"policy_for_exhibition\"\
+      \ = \"Exhibitions\".\"Exhibition_Catalog_Code\"\n      AND p.\"total_coverage_value_usd\"\
+      \ > 0\n  )"
+    reference_is_original: false
+    reference_model_sql: "CREATE OR REPLACE VIEW \"int_exhibition_risk_profile\" AS\n\
+      WITH policy_agg AS (\n  SELECT\n    \"policy_for_exhibition\",\n    COUNT(*)::INTEGER\
+      \ AS num_policies,\n    SUM(\"total_coverage_value_usd\") AS total_coverage_value_usd\n\
+      \  FROM \"stg_insurance_policies\"\n  WHERE \"policy_for_exhibition\" IS NOT\
+      \ NULL\n  GROUP BY \"policy_for_exhibition\"\n),\nplan_agg AS (\n  SELECT\n\
+      \    \"plan_for_hall\",\n    COUNT(*)::INTEGER AS num_emergency_plans\n  FROM\
+      \ \"stg_emergency_plans\"\n  GROUP BY \"plan_for_hall\"\n)\nSELECT\n  e.\"Exhibition_Catalog_Code\"\
+      ,\n  e.\"location_in_hall\",\n  COALESCE(p.total_coverage_value_usd, 0::NUMERIC)\
+      \ AS total_coverage_value_usd,\n  COALESCE(p.num_policies, 0::INTEGER) AS num_policies,\n\
+      \  COALESCE(pl.num_emergency_plans, 0::INTEGER) AS num_emergency_plans,\n  ROUND(\n\
+      \    ((e.\"actual_cost\"::NUMERIC - e.\"BUDGET_USD\"::NUMERIC) / e.\"BUDGET_USD\"\
+      ::NUMERIC * 100),\n    2\n  ) AS budget_variance_pct,\n  CASE\n    WHEN COALESCE(p.total_coverage_value_usd,\
+      \ 0) = 0 AND e.\"actual_cost\" > e.\"BUDGET_USD\" THEN\n      ROUND(-((e.\"\
+      actual_cost\"::NUMERIC - e.\"BUDGET_USD\"::NUMERIC) / e.\"BUDGET_USD\"::NUMERIC\
+      \ * 100), 2)\n    WHEN COALESCE(p.total_coverage_value_usd, 0) = 0 THEN 0::NUMERIC\n\
+      \    ELSE ROUND(\n        COALESCE(pl.num_emergency_plans, 0)::NUMERIC *\n \
+      \       COALESCE(p.total_coverage_value_usd / NULLIF(p.num_policies::NUMERIC,\
+      \ 0), 0::NUMERIC) /\n        e.\"BUDGET_USD\"::NUMERIC,\n        2\n      )\n\
+      \  END AS risk_preparedness_score\nFROM \"stg_exhibitions\" e\nLEFT JOIN policy_agg\
+      \ p ON p.\"policy_for_exhibition\" = e.\"Exhibition_Catalog_Code\"\nLEFT JOIN\
+      \ plan_agg pl ON pl.\"plan_for_hall\" = e.\"location_in_hall\""
+    target_model_id: int_exhibition_risk_profile
+    target_view_name: int_exhibition_risk_profile
+    verification_mode: breach_visible
+    verification_result:
+      changed_row_count: 6
+      diagnostics: All 5 steps passed.
+      passed: true
+      raw_error: null
+      step_results:
+      - delta: null
+        detail: event_sql executed
+        passed: true
+        step: 1
+        threshold: null
+      - delta: 0.12
+        detail: delta=0.1200, changed_rows=6
+        passed: true
+        step: 2
+        threshold: null
+      - delta: 0.12
+        detail: delta 0.1200 >= 0.05
+        passed: true
+        step: 3
+        threshold: 0.05
+      - delta: null
+        detail: pipeline silent on S2
+        passed: true
+        step: 4
+        threshold: null
+      - delta: 0.43333333333333335
+        detail: fix_impact=0.4333, fix_stability=0.1200
+        passed: true
+        step: 5
+        threshold: 0.05
+      view_row_count: 47
+  - atom_id: d0748a76e70c
+    event_log:
+      after_state: null
+      before_state: null
+      description: Exhibition curators overspent budgets without corresponding insurance
+        coverage increases. Three exhibitions exceeded budgets by 30% with no additional
+        insurance purchased.
+      event_id: 4663f16f88ee
+      event_type: DISTRIBUTION_SHIFT
+      target_object: int_exhibition_risk_profile
+      timestamp: '2026-04-19T00:10:06.023697Z'
+    event_log_info_level: medium
+    event_sql: 'UPDATE "Exhibitions" SET "actual_cost" = 520000.0 WHERE "Exhibition_Catalog_Code"
+      = ''EXH-2017-02'';
+
+      UPDATE "Exhibitions" SET "actual_cost" = 585000.0 WHERE "Exhibition_Catalog_Code"
+      = ''EXH-2020-02'';
+
+      UPDATE "Exhibitions" SET "actual_cost" = 1170000.0 WHERE "Exhibition_Catalog_Code"
+      = ''EXH-2013-01'';'
+    reference_is_original: false
+    reference_model_sql: "CREATE OR REPLACE VIEW \"int_exhibition_risk_profile\" AS\n\
+      WITH policy_agg AS (\n  SELECT\n    \"policy_for_exhibition\",\n    COUNT(*)::INTEGER\
+      \ AS num_policies,\n    SUM(\"total_coverage_value_usd\") AS total_coverage_value_usd\n\
+      \  FROM \"stg_insurance_policies\"\n  WHERE \"policy_for_exhibition\" IS NOT\
+      \ NULL\n  GROUP BY \"policy_for_exhibition\"\n),\nplan_agg AS (\n  SELECT\n\
+      \    \"plan_for_hall\",\n    COUNT(*)::INTEGER AS num_emergency_plans\n  FROM\
+      \ \"stg_emergency_plans\"\n  GROUP BY \"plan_for_hall\"\n)\nSELECT\n  e.\"Exhibition_Catalog_Code\"\
+      ,\n  e.\"location_in_hall\",\n  COALESCE(p.total_coverage_value_usd, 0::NUMERIC)\
+      \ AS total_coverage_value_usd,\n  COALESCE(p.num_policies, 0::INTEGER) AS num_policies,\n\
+      \  COALESCE(pl.num_emergency_plans, 0::INTEGER) AS num_emergency_plans,\n  ROUND(\n\
+      \    ((e.\"actual_cost\"::NUMERIC - e.\"BUDGET_USD\"::NUMERIC) / e.\"BUDGET_USD\"\
+      ::NUMERIC * 100),\n    2\n  ) AS budget_variance_pct,\n  CASE\n    WHEN COALESCE(p.num_policies,\
+      \ 0) = 0 AND e.\"actual_cost\" > e.\"BUDGET_USD\" THEN\n      ROUND(\n     \
+      \   ((e.\"BUDGET_USD\"::NUMERIC - e.\"actual_cost\"::NUMERIC) / e.\"BUDGET_USD\"\
+      ::NUMERIC * 100) *\n        LEAST(COALESCE(pl.num_emergency_plans, 0), 3) /\
+      \ 10,\n        2\n      )\n    WHEN COALESCE(p.total_coverage_value_usd, 0)\
+      \ = 0 AND COALESCE(p.num_policies, 0) > 0 AND e.\"actual_cost\" > e.\"BUDGET_USD\"\
+      \ THEN\n      ROUND(\n        ((e.\"BUDGET_USD\"::NUMERIC - e.\"actual_cost\"\
+      ::NUMERIC) / e.\"BUDGET_USD\"::NUMERIC * 100) *\n        LEAST(COALESCE(pl.num_emergency_plans,\
+      \ 0), 3) / 10,\n        2\n      )\n    ELSE\n      ROUND(\n        COALESCE(pl.num_emergency_plans,\
+      \ 0)::NUMERIC *\n        COALESCE(p.total_coverage_value_usd / NULLIF(p.num_policies::NUMERIC,\
+      \ 0), 0::NUMERIC) /\n        e.\"BUDGET_USD\"::NUMERIC,\n        2\n      )\n\
+      \  END AS risk_preparedness_score\nFROM \"stg_exhibitions\" e\nLEFT JOIN policy_agg\
+      \ p ON p.\"policy_for_exhibition\" = e.\"Exhibition_Catalog_Code\"\nLEFT JOIN\
+      \ plan_agg pl ON pl.\"plan_for_hall\" = e.\"location_in_hall\""
+    target_model_id: int_exhibition_risk_profile
+    target_view_name: int_exhibition_risk_profile
+    verification_mode: breach_visible
+    verification_result:
+      changed_row_count: 6
+      diagnostics: All 5 steps passed.
+      passed: true
+      raw_error: null
+      step_results:
+      - delta: null
+        detail: event_sql executed
+        passed: true
+        step: 1
+        threshold: null
+      - delta: 0.12
+        detail: delta=0.1200, changed_rows=6
+        passed: true
+        step: 2
+        threshold: null
+      - delta: 0.12
+        detail: delta 0.1200 >= 0.05
+        passed: true
+        step: 3
+        threshold: 0.05
+      - delta: null
+        detail: pipeline silent on S2
+        passed: true
+        step: 4
+        threshold: null
+      - delta: 0.3508771929824561
+        detail: fix_impact=0.3509, fix_stability=0.1200
+        passed: true
+        step: 5
+        threshold: 0.05
+      view_row_count: 47
+  - atom_id: 83259afd479c
+    event_log:
+      after_state: null
+      before_state: null
+      description: "Exhibition curators at the museum have been allocating increasing\
+        \ budgets to traveling and special exhibitions while deferring insurance coverage\
+        \ renewals. Recently, three exhibitions\u2014EXH-2017-02 (Sounds of Antiquity:\
+        \ Ritual Bells of the Bronze Age), EXH-2020-02 (Gold and Silver: Metalwork\
+        \ of the Tang Dynasty), and EXH-2013-01 (The Five Great Wares: Masterpieces\
+        \ of Song Ceramics)\u2014experienced budget overruns ranging from 5.5% to\
+        \ 6.25%. While these exhibitions have active emergency response plans in their\
+        \ respective halls, their insurance policies were allowed to lapse during\
+        \ budget reallocation cycles. The museum's risk_preparedness_score treats\
+        \ these uninsured high-exposure exhibitions identically to exhibitions with\
+        \ no emergency plans at all, showing a score of 0 rather than flagging the\
+        \ coverage gap. This creates a coverage illusion where the presence of emergency\
+        \ protocols masks the absence of financial protection, leading risk management\
+        \ dashboards to incorrectly conclude these exhibitions are adequately prepared."
+      event_id: 725e6d8f49e0
+      event_type: DISTRIBUTION_SHIFT
+      target_object: int_exhibition_risk_profile
+      timestamp: '2026-04-19T01:19:52.287549Z'
+    event_log_info_level: medium
+    event_sql: "INSERT INTO \"InsurancePolicies\" (\"Policy_Contract_Num\", \"POLICY_ID_CODE\"\
+      , \"provider_name\", \"policy_type\", \"start_date\", \"end_date\", \"IS_ACTIVE\"\
+      , \"policy_for_exhibition\", \"policy_updated_by\", \"policy_financials\")\n\
+      VALUES \n  ('POL-BR-001', 'BR-2017-02', 'Museum Mutual', 'Exhibition', '2017-01-01',\
+      \ '2018-12-31', true, 'EXH-2017-02', 2, '{\"deductible_usd\": 5000, \"annual_premium_usd\"\
+      : 2500, \"total_coverage_value_usd\": 425000}'),\n  ('POL-BR-002', 'BR-2020-02',\
+      \ 'Museum Mutual', 'Exhibition', '2020-01-01', '2021-12-31', true, 'EXH-2020-02',\
+      \ 2, '{\"deductible_usd\": 5000, \"annual_premium_usd\": 2500, \"total_coverage_value_usd\"\
+      : 475000}'),\n  ('POL-BR-003', 'BR-2013-01', 'Museum Mutual', 'Exhibition',\
+      \ '2013-01-01', '2014-12-31', true, 'EXH-2013-01', 2, '{\"deductible_usd\":\
+      \ 5000, \"annual_premium_usd\": 2500, \"total_coverage_value_usd\": 950000}');\n\
+      DELETE FROM \"InsurancePolicies\" WHERE \"Policy_Contract_Num\" IN ('POL-BR-001',\
+      \ 'POL-BR-002', 'POL-BR-003');"
+    reference_is_original: false
+    reference_model_sql: "CREATE OR REPLACE VIEW \"int_exhibition_risk_profile\" AS\n\
+      WITH policy_agg AS (\n  SELECT\n    \"policy_for_exhibition\",\n    COUNT(*)::INTEGER\
+      \ AS num_policies,\n    SUM(\"total_coverage_value_usd\") AS total_coverage_value_usd\n\
+      \  FROM \"stg_insurance_policies\"\n  WHERE \"policy_for_exhibition\" IS NOT\
+      \ NULL\n  GROUP BY \"policy_for_exhibition\"\n),\nplan_agg AS (\n  SELECT\n\
+      \    \"plan_for_hall\",\n    COUNT(*)::INTEGER AS num_emergency_plans,\n   \
+      \ MIN(ep.plan_version::NUMERIC) AS oldest_plan_version_numeric\n  FROM \"stg_emergency_plans\"\
+      \ ep\n  GROUP BY \"plan_for_hall\"\n)\nSELECT\n  e.\"Exhibition_Catalog_Code\"\
+      ,\n  e.\"location_in_hall\",\n  COALESCE(p.total_coverage_value_usd, 0::NUMERIC)\
+      \ AS total_coverage_value_usd,\n  COALESCE(p.num_policies, 0::INTEGER) AS num_policies,\n\
+      \  COALESCE(pl.num_emergency_plans, 0::INTEGER) AS num_emergency_plans,\n  ROUND(\n\
+      \    ((e.\"actual_cost\"::NUMERIC - e.\"BUDGET_USD\"::NUMERIC) / e.\"BUDGET_USD\"\
+      ::NUMERIC * 100),\n    2\n  ) AS budget_variance_pct,\n  ROUND(\n    CASE \n\
+      \      WHEN COALESCE(p.num_policies, 0) = 0 AND COALESCE(pl.num_emergency_plans,\
+      \ 0) > 0 THEN\n        (-1 * (1 + (e.\"actual_cost\"::NUMERIC - e.\"BUDGET_USD\"\
+      ::NUMERIC) / NULLIF(e.\"BUDGET_USD\"::NUMERIC, 0) * 100))\n      ELSE\n    \
+      \    COALESCE(pl.num_emergency_plans, 0)::NUMERIC *\n        COALESCE(p.total_coverage_value_usd\
+      \ / NULLIF(p.num_policies::NUMERIC, 0), 0::NUMERIC) /\n        e.\"BUDGET_USD\"\
+      ::NUMERIC\n    END,\n    2\n  ) AS risk_preparedness_score\nFROM \"stg_exhibitions\"\
+      \ e\nLEFT JOIN policy_agg p ON p.\"policy_for_exhibition\" = e.\"Exhibition_Catalog_Code\"\
+      \nLEFT JOIN plan_agg pl ON pl.\"plan_for_hall\" = e.\"location_in_hall\""
+    target_model_id: int_exhibition_risk_profile
+    target_view_name: int_exhibition_risk_profile
+    verification_mode: breach_silent
+    verification_result:
+      changed_row_count: 0
+      diagnostics: All 5 steps passed.
+      passed: true
+      raw_error: null
+      step_results:
+      - delta: null
+        detail: event_sql executed
+        passed: true
+        step: 1
+        threshold: null
+      - delta: 0.0
+        detail: delta=0.0000, changed_rows=0
+        passed: true
+        step: 2
+        threshold: null
+      - delta: 0.0
+        detail: 'breach_silent: delta 0.0000 < 0.01 (silent failure confirmed)'
+        passed: true
+        step: 3
+        threshold: 0.01
+      - delta: null
+        detail: pipeline silent on S2
+        passed: true
+        step: 4
+        threshold: null
+      - delta: 0.6376811594202898
+        detail: fix_impact=0.6377, fix_stability=0.0000
+        passed: true
+        step: 5
+        threshold: 0.05
+      view_row_count: 47
+  composition_rules:
+  - cascade_depth: null
+    cascade_target_model: null
+    conflicting_atom_ids: null
+    decoy_model_sql: null
+    impact_type: null
+    input_component_ids:
+    - d0748a76e70c
+    noise_event_log: null
+    noise_event_sql: null
+    output_component_id: 895a316dee1b
+    postcondition: Fix risk_preparedness_score false negative for uninsured budget
+      overruns
+    precondition_met: false
+    protected_model_ids: null
+    report_id: null
+    report_ids:
+    - RiskManagementReport
+    rule_type: cross_report
+    shared_metric: null
+    target_atom_id: null
+    verification_passed: true
+  depth: 3
+  expression_id: ea7dabc9c8fd
+  lock_grade: partial_forged
+  operator_pattern:
+    cross_report_count: 1
+    has_conflict: false
+    has_trap: false
+    max_cascade_depth: 2
+    noise_count: 0
+    report_impact_count: 0
+    rule_types:
+    - cross_report
+    - cascade
